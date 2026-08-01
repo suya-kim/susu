@@ -2,20 +2,21 @@ import json
 import os
 import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 REST_API_KEY = os.environ["KAKAO_REST_API_KEY"]
 CLIENT_SECRET = os.environ["KAKAO_CLIENT_SECRET"]
 REFRESH_TOKEN = os.environ["KAKAO_REFRESH_TOKEN"]
 
-# 현재 테스트 조건
-START_DAY = "2026-9-22"
-END_DAY = "2026-9-23"
-START_TIMESTAMP = "1785510000"
-END_TIMESTAMP = "1785596400"
+START_DAY = "2026-9-12"
+END_DAY = "2026-9-13"
+DISPLAY_DATE = "2026-09-12 ~ 2026-09-13"
 
 
 def post(url, data, headers=None):
     encoded = urllib.parse.urlencode(data).encode()
+
     request = urllib.request.Request(
         url,
         data=encoded,
@@ -25,6 +26,14 @@ def post(url, data, headers=None):
 
     with urllib.request.urlopen(request, timeout=30) as response:
         return response.read().decode()
+
+
+def get_timestamps():
+    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow = today + timedelta(days=1)
+
+    return str(int(today.timestamp())), str(int(tomorrow.timestamp()))
 
 
 def refresh_access_token():
@@ -51,6 +60,8 @@ def refresh_access_token():
 
 
 def check_booking():
+    start_timestamp, end_timestamp = get_timestamps()
+
     response = post(
         "https://woraksan.co.kr/booking/html_day_booking.cm",
         {
@@ -58,9 +69,9 @@ def check_booking():
                 "https://woraksan.co.kr/Reservation---?idx=21",
             "prod_idx": "21",
             "start_day": START_DAY,
-            "start_timestamp": START_TIMESTAMP,
+            "start_timestamp": start_timestamp,
             "end_day": END_DAY,
-            "end_timestamp": END_TIMESTAMP,
+            "end_timestamp": end_timestamp,
             "person": "0",
             "idx": "21",
         },
@@ -82,14 +93,19 @@ def check_booking():
     return available
 
 
-def send_kakao_message(access_token):
+def send_kakao_message(access_token, available):
+    if available:
+        status = "✅ 현재 예약 가능합니다!"
+    else:
+        status = "❌ 현재 예약할 수 없습니다."
+
     template = {
         "object_type": "text",
         "text": (
-            "🏨 월악산 예약 확인\n"
-            "TYPE B - 204\n"
-            "2026-09-22 ~ 2026-09-23\n"
-            "현재 예약 가능한 상태입니다."
+            "🏨 월악산 유스호스텔 예약 확인\n"
+            "객실: TYPE B - 204\n"
+            f"날짜: {DISPLAY_DATE}\n"
+            f"{status}"
         ),
         "link": {
             "web_url": "https://suya-kim.github.io/susu/",
@@ -117,8 +133,6 @@ def send_kakao_message(access_token):
 
 
 if __name__ == "__main__":
-    if check_booking():
-        token = refresh_access_token()
-        send_kakao_message(token)
-    else:
-        print("현재 예약할 수 없습니다.")
+    available = check_booking()
+    token = refresh_access_token()
+    send_kakao_message(token, available)
