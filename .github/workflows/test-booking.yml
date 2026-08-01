@@ -1,4 +1,4 @@
-name: 월악산 예약 알림 테스트
+name: 월악산 유스호스텔 예약 알림 테스트
 
 on:
   workflow_dispatch:
